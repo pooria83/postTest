@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers\Api\v1;
 
+use App\Exceptions\DbErrorException;
 use App\Exceptions\ValidationErrorException;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use \Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Validation\Rule;
-
 
 
 class PostController extends Controller
@@ -26,7 +27,16 @@ class PostController extends Controller
      */
     public function index()
     {
-        //
+        try{
+        $posts = Post::all();
+        }catch (QueryException $exception) {
+            throw new DbErrorException($exception->errorInfo);
+        }
+        return json_encode( [
+            'status' => true,
+            'result' => $posts
+        ]);
+
     }
 
     /**
