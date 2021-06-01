@@ -27,16 +27,15 @@ class PostController extends Controller
      */
     public function index()
     {
-        try{
-        $posts = Post::all();
-        }catch (QueryException $exception) {
+        try {
+            $posts = Post::all();
+        } catch (QueryException $exception) {
             throw new DbErrorException($exception->errorInfo);
         }
-        return json_encode( [
+        return json_encode([
             'status' => true,
             'result' => $posts
         ]);
-
     }
 
     /**
@@ -75,10 +74,14 @@ class PostController extends Controller
             throw new ValidationErrorException($validator->errors()->messages());
         }
 
-        $insert_id = Post::insertGetId([
-            'title' => $data['title'],
-            'description' => $data['description']
-        ]);
+        try {
+            $insert_id = Post::insertGetId([
+                'title' => $data['title'],
+                'description' => $data['description']
+            ]);
+        } catch (QueryException $exception) {
+            throw new DbErrorException($exception->errorInfo);
+        }
 
         if ($insert_id) {
             return  new JsonResponse([
@@ -96,7 +99,15 @@ class PostController extends Controller
      */
     public function show($id)
     {
-        //
+        try {
+            $post = Post::find($id);
+        } catch (QueryException $exception) {
+            throw new DbErrorException($exception->errorInfo);
+        }
+        return json_encode([
+            'status' => true,
+            'result' => $post
+        ]);
     }
 
     /**
@@ -119,7 +130,36 @@ class PostController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $post = Post::find($id);
+        $data = $request->json()->all();
+        $description = $request->json('description');
+        $validator = Validator::make($request->json()->all(), [
+            'title' => [
+                'string', 'min:10', 'max:50',
+                Rule::unique('posts', 'title')->where(function ($query) use ($description, $id) {
+                    return $query->where('description', $description)
+                        ->where('id', '<>', $id);
+                })
+            ],
+            'description' => ['string', 'min:50', 'max:1000']
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationErrorException($validator->errors()->messages());
+        }
+
+
+        try {
+            $post->update($data);
+        } catch (QueryException $exception) {
+            throw new DbErrorException($exception->errorInfo);
+        }
+
+
+        return  new JsonResponse([
+            'status' => true,
+            'result' => "post id {$id} Updated!"
+        ], Response::HTTP_OK);
     }
 
     /**
@@ -130,6 +170,36 @@ class PostController extends Controller
      */
     public function destroy($id)
     {
-        //
+        try {
+        $post = Post::find($id);
+        } catch (QueryException $exception) {
+            throw new DbErrorException($exception->errorInfo);
+        }
+
+        if(! empty($post))
+        {
+            try{
+                $post->delete();
+            }
+            catch (QueryException $exception) {
+                throw new DbErrorException($exception->errorInfo);
+            }
+
+            return  new JsonResponse([
+                'status' => true,
+                'result' => "post id {$id} deleted!"
+            ], Response::HTTP_OK);
+        }
+        else
+        {
+            return  new JsonResponse([
+                'status' => false,
+                'result' => "post id {$id} not found!"
+            ], Response::HTTP_OK);
+        }
+
+
+
+
     }
 }
